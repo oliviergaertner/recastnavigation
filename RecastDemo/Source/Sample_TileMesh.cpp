@@ -22,6 +22,11 @@
 #include <string.h>
 #include "SDL.h"
 #include "SDL_opengl.h"
+#ifdef __APPLE__
+#	include <OpenGL/glu.h>
+#else
+#	include <GL/glu.h>
+#endif
 #include "imgui.h"
 #include "InputGeom.h"
 #include "Sample.h"
@@ -1018,7 +1023,8 @@ unsigned char* Sample_TileMesh::buildTileMesh(const int tx, const int ty, const 
 		rcMarkWalkableTriangles(m_ctx, m_cfg.walkableSlopeAngle,
 								verts, nverts, ctris, nctris, m_triareas);
 		
-		rcRasterizeTriangles(m_ctx, verts, nverts, ctris, m_triareas, nctris, *m_solid, m_cfg.walkableClimb);
+		if (!rcRasterizeTriangles(m_ctx, verts, nverts, ctris, m_triareas, nctris, *m_solid, m_cfg.walkableClimb))
+			return 0;
 	}
 	
 	if (!m_keepInterResults)

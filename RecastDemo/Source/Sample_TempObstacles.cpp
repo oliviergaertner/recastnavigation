@@ -24,6 +24,11 @@
 #include <new>
 #include "SDL.h"
 #include "SDL_opengl.h"
+#ifdef __APPLE__
+#	include <OpenGL/glu.h>
+#else
+#	include <GL/glu.h>
+#endif
 #include "imgui.h"
 #include "InputGeom.h"
 #include "Sample.h"
@@ -348,7 +353,8 @@ static int rasterizeTileLayers(BuildContext* ctx, InputGeom* geom,
 		rcMarkWalkableTriangles(ctx, tcfg.walkableSlopeAngle,
 								verts, nverts, tris, ntris, rc.triareas);
 		
-		rcRasterizeTriangles(ctx, verts, nverts, tris, rc.triareas, ntris, *rc.solid, tcfg.walkableClimb);
+		if (!rcRasterizeTriangles(ctx, verts, nverts, tris, rc.triareas, ntris, *rc.solid, tcfg.walkableClimb))
+			return 0;
 	}
 	
 	// Once all geometry is rasterized, we do initial pass of filtering to
