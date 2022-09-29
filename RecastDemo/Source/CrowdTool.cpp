@@ -144,8 +144,6 @@ void CrowdToolState::init(class Sample* sample)
 	if (m_sample != sample)
 	{
 		m_sample = sample;
-//		m_oldFlags = m_sample->getNavMeshDrawFlags();
-//		m_sample->setNavMeshDrawFlags(m_oldFlags & ~DU_DRAWNAVMESH_CLOSEDLIST);
 	}
 	
 	dtNavMesh* nav = m_sample->getNavMesh();
@@ -203,7 +201,7 @@ void CrowdToolState::reset()
 
 void CrowdToolState::handleRender()
 {
-	DebugDrawGL dd;
+	duDebugDraw& dd = m_sample->getDebugDraw();
 	const float rad = m_sample->getAgentRadius();
 	
 	dtNavMesh* nav = m_sample->getNavMesh();
@@ -712,7 +710,7 @@ void CrowdToolState::setMoveTarget(const float* p, bool adjust)
 	dtNavMeshQuery* navquery = m_sample->getNavMeshQuery();
 	dtCrowd* crowd = m_sample->getCrowd();
 	const dtQueryFilter* filter = crowd->getFilter(0);
-	const float* ext = crowd->getQueryExtents();
+	const float* halfExtents = crowd->getQueryExtents();
 
 	if (adjust)
 	{
@@ -740,7 +738,7 @@ void CrowdToolState::setMoveTarget(const float* p, bool adjust)
 	}
 	else
 	{
-		navquery->findNearestPoly(p, ext, filter, &m_targetRef, m_targetPos);
+		navquery->findNearestPoly(p, halfExtents, filter, &m_targetRef, m_targetPos);
 		
 		if (m_agentDebug.idx != -1)
 		{
@@ -854,7 +852,7 @@ void CrowdToolState::updateTick(const float dt)
 	m_agentDebug.vod->normalizeSamples();
 	
 	m_crowdSampleCount.addSample((float)crowd->getVelocitySampleCount());
-	m_crowdTotalTime.addSample(getPerfDeltaTimeUsec(startTime, endTime) / 1000.0f);
+	m_crowdTotalTime.addSample(getPerfTimeUsec(endTime - startTime) / 1000.0f);
 }
 
 
@@ -864,10 +862,6 @@ CrowdTool::CrowdTool() :
 	m_sample(0),
 	m_state(0),
 	m_mode(TOOLMODE_CREATE)
-{
-}
-
-CrowdTool::~CrowdTool()
 {
 }
 
@@ -1036,10 +1030,10 @@ void CrowdTool::handleClick(const float* s, const float* p, bool shift)
 		if (nav && navquery)
 		{
 			dtQueryFilter filter;
-			const float* ext = crowd->getQueryExtents();
+			const float* halfExtents = crowd->getQueryExtents();
 			float tgt[3];
 			dtPolyRef ref;
-			navquery->findNearestPoly(p, ext, &filter, &ref, tgt);
+			navquery->findNearestPoly(p, halfExtents, &filter, &ref, tgt);
 			if (ref)
 			{
 				unsigned short flags = 0;

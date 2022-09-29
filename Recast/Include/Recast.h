@@ -185,6 +185,10 @@ public:
 	inline ~rcScopedTimer() { m_ctx->stopTimer(m_label); }
 
 private:
+	// Explicitly disabled copy constructor and copy assignment operator.
+	rcScopedTimer(const rcScopedTimer&);
+	rcScopedTimer& operator=(const rcScopedTimer&);
+	
 	rcContext* const m_ctx;
 	const rcTimerLabel m_label;
 };
@@ -289,6 +293,9 @@ struct rcSpanPool
 /// @ingroup recast
 struct rcHeightfield
 {
+	rcHeightfield();
+	~rcHeightfield();
+
 	int width;			///< The width of the heightfield. (Along the x-axis in cell units.)
 	int height;			///< The height of the heightfield. (Along the z-axis in cell units.)
 	float bmin[3];  	///< The minimum bounds in world space. [(x, y, z)]
@@ -298,6 +305,11 @@ struct rcHeightfield
 	rcSpan** spans;		///< Heightfield of spans (width*height).
 	rcSpanPool* pools;	///< Linked list of span pools.
 	rcSpan* freelist;	///< The next free span.
+
+private:
+	// Explicitly-disabled copy constructor and copy assignment operator.
+	rcHeightfield(const rcHeightfield&);
+	rcHeightfield& operator=(const rcHeightfield&);
 };
 
 /// Provides information on the content of a cell column in a compact heightfield. 
@@ -320,6 +332,8 @@ struct rcCompactSpan
 /// @ingroup recast
 struct rcCompactHeightfield
 {
+	rcCompactHeightfield();
+	~rcCompactHeightfield();
 	int width;					///< The width of the heightfield. (Along the x-axis in cell units.)
 	int height;					///< The height of the heightfield. (Along the z-axis in cell units.)
 	int spanCount;				///< The number of spans in the heightfield.
@@ -364,6 +378,8 @@ struct rcHeightfieldLayer
 /// @see rcAllocHeightfieldLayerSet, rcFreeHeightfieldLayerSet 
 struct rcHeightfieldLayerSet
 {
+	rcHeightfieldLayerSet();
+	~rcHeightfieldLayerSet();
 	rcHeightfieldLayer* layers;			///< The layers in the set. [Size: #nlayers]
 	int nlayers;						///< The number of layers in the set.
 };
@@ -383,6 +399,8 @@ struct rcContour
 /// @ingroup recast
 struct rcContourSet
 {
+	rcContourSet();
+	~rcContourSet();
 	rcContour* conts;	///< An array of the contours in the set. [Size: #nconts]
 	int nconts;			///< The number of contours in the set.
 	float bmin[3];  	///< The minimum bounds in world space. [(x, y, z)]
@@ -392,12 +410,15 @@ struct rcContourSet
 	int width;			///< The width of the set. (Along the x-axis in cell units.) 
 	int height;			///< The height of the set. (Along the z-axis in cell units.) 
 	int borderSize;		///< The AABB border size used to generate the source data from which the contours were derived.
+	float maxError;		///< The max edge error that this contour set was simplified with.
 };
 
 /// Represents a polygon mesh suitable for use in building a navigation mesh. 
 /// @ingroup recast
 struct rcPolyMesh
 {
+	rcPolyMesh();
+	~rcPolyMesh();
 	unsigned short* verts;	///< The mesh vertices. [Form: (x, y, z) * #nverts]
 	unsigned short* polys;	///< Polygon and neighbor data. [Length: #maxpolys * 2 * #nvp]
 	unsigned short* regs;	///< The region id assigned to each polygon. [Length: #maxpolys]
@@ -412,6 +433,7 @@ struct rcPolyMesh
 	float cs;				///< The size of each cell. (On the xz-plane.)
 	float ch;				///< The height of each cell. (The minimum increment along the y-axis.)
 	int borderSize;			///< The AABB border size used to generate the source data from which the mesh was derived.
+	float maxEdgeError;		///< The max error of the polygon edges in the mesh.
 };
 
 /// Contains triangle meshes that represent detailed height data associated 
@@ -512,6 +534,14 @@ void rcFreePolyMeshDetail(rcPolyMeshDetail* dmesh);
 /// (Used during the region and contour build process.)
 /// @see rcCompactSpan::reg
 static const unsigned short RC_BORDER_REG = 0x8000;
+
+/// Polygon touches multiple regions.
+/// If a polygon has this region ID it was merged with or created
+/// from polygons of different regions during the polymesh
+/// build step that removes redundant border vertices. 
+/// (Used during the polymesh and detail polymesh build processes)
+/// @see rcPolyMesh::regs
+static const unsigned short RC_MULTIPLE_REGS = 0;
 
 /// Border vertex flag.
 /// If a region ID has this bit set, then the associated element lies on
@@ -872,7 +902,7 @@ bool rcRasterizeTriangles(rcContext* ctx, const float* verts, const int nv,
 bool rcRasterizeTriangles(rcContext* ctx, const float* verts, const unsigned char* areas, const int nt,
 						  rcHeightfield& solid, const int flagMergeThr = 1);
 
-/// Marks non-walkable spans as walkable if their maximum is within @p walkableClimp of a walkable neihbor. 
+/// Marks non-walkable spans as walkable if their maximum is within @p walkableClimp of a walkable neighbor. 
 ///  @ingroup recast
 ///  @param[in,out]	ctx				The build context to use during the operation.
 ///  @param[in]		walkableClimb	Maximum ledge height that is considered to still be traversable. 
@@ -1059,7 +1089,7 @@ inline int rcGetCon(const rcCompactSpan& s, int dir)
 ///  	in the direction.
 inline int rcGetDirOffsetX(int dir)
 {
-	const int offset[4] = { -1, 0, 1, 0, };
+	static const int offset[4] = { -1, 0, 1, 0, };
 	return offset[dir&0x03];
 }
 
@@ -1069,8 +1099,18 @@ inline int rcGetDirOffsetX(int dir)
 ///  	in the direction.
 inline int rcGetDirOffsetY(int dir)
 {
-	const int offset[4] = { 0, 1, 0, -1 };
+	static const int offset[4] = { 0, 1, 0, -1 };
 	return offset[dir&0x03];
+}
+
+/// Gets the direction for the specified offset. One of x and y should be 0.
+///  @param[in]		x		The x offset. [Limits: -1 <= value <= 1]
+///  @param[in]		y		The y offset. [Limits: -1 <= value <= 1]
+///  @return The direction that represents the offset.
+inline int rcGetDirForOffset(int x, int y)
+{
+	static const int dirs[5] = { 3, 0, -1, 2, 1 };
+	return dirs[((y+1)<<1)+x];
 }
 
 /// @}
